@@ -1,0 +1,224 @@
+---
+title: "Exploring Data Science Salaries"
+author: "Zachary Fuller, Nathalie Wei"
+date: "2023-12-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(knitr)
+library(janitor)
+library(tidyr)
+library(dplyr)
+library(kableExtra)
+library(scales)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r ds_salaries}
+ds_salaries_data <- read.csv2(file = "~/PSU Classes/Stat 184/Stat 184 Final Project/ds_salaries.csv", sep = ",", comment.char = "#")
+```
+
+For our project we decided to look at salaries of those in the field of data science. We thought this data would be intriguing to look at as it correlates to our majors, and many of the jobs listed are those in which we could be working in the future. The data set comes from kaggle and serves as a way to see the many details of a data scientist and how they correspond to one another. 
+
+For our project we will be aiming to answer these questions:
+1. What job titles are most common within the data set?
+2. How does the experience level and employment type of a data scientist correlate to their salary?
+3. How does the size of the company of a data scientist correlate to their salary
+4. Do data scientist make a good salary? (The answer is yes)
+
+We have many data visualizations that focus on these three questions as we seek to learn more about the data. While some visualizations may seem similar, they all serve a different purpose in helping us understand the data, and are helpful to the audience as no two people read data the same.
+
+
+The example below aims to determine the prominence of each job title by finding the total and percentage of each job in the data science salaries set through the use of a summary table.
+```{r SummaryTable}
+# Load data
+data("ds_salaries_data", package = "ggplot2")
+# Build Summary table
+## Dplyr Approach
+sumTable1 <- ds_salaries_data %>%
+  group_by(job_title) %>%
+  summarize(
+    count = n(),
+    Percentage = n() / nrow(ds_salaries_data) * 100) %>%
+  arrange(desc(Percentage))
+# Create the pretty table
+sumTable1 %>%
+  kable(
+    digits = 2,
+    format.args = list(big.mark = ","),
+    caption = "Summary Statistics for Job Title",
+    col.names = c("Job Title", "Total", "Percentage"),
+    align = c("l", rep("c", 2)),
+    booktabs = TRUE
+  ) %>%
+  kableExtra::kable_classic()
+```
+The summary table shows us which jobs are associated with the most people and is organized in descending order.
+
+The next summary table shows us the percentage and totals of each job title based on their company size.
+```{r summaryTable}
+ds_salariesTable <- ds_salaries_data %>%
+  tabyl(job_title, company_size) %>% # automatically calculate percentages
+  adorn_totals(where = c("row", "col")) %>% # add rows and columns
+  adorn_percentages(denominator = "all") %>% # round data frame
+  adorn_pct_formatting(digits = 2) 
+formatNs <- attr(ds_salariesTable, "core") %>%
+  adorn_totals(where = c("row", "col")) %>%
+  mutate(
+    across(where(is.numeric), format, big.mark = ",") 
+  )
+newds_salariesdataTable <- ds_salariesTable %>%
+  adorn_ns(position = "front", ns = formatNs)
+# Create pretty table
+ newds_salariesdataTable %>%
+  kable(
+    caption = "Job Title by Company Size",
+    col.names = c("Job Title", "L", "M", "S", "Total"),
+    align = "lcccc",
+    booktabs = TRUE
+  ) %>%
+  kableExtra::kable_classic()
+```
+
+
+The data visualization below is a scatter plot that aims to help us find the correlation between a workers employment type and experience level in relation to their salary. The scatter plot is helpful in this instance as we are able to connect two different variables to the salary in one visualization. 
+KEY:
+Experience Level:
+EN - Entry
+EX - Executive
+MI - Mid-level
+SE - Senior
+Employment Type:
+CT - Contract
+FL - Freelance
+FT - Full Time
+PT - Part Time
+
+```{r ds_salaries scatterplot}
+# plot experience level of data scientist on the x axis and the salary of data scientist on y axis
+ggplot( data = ds_salaries_data, mapping = aes( x = experience_level, y = salary_in_usd, color = employment_type, shape = employment_type) ) + # distinguish employment type by shape and color
+# label x and y axis
+    geom_point(data=ds_salaries_data[ds_salaries_data$employment_type=="FT", ], size=1) + # make employment type FT a size of 1
+  geom_point(data=ds_salaries_data[ds_salaries_data$employment_type!="FT", ], size=4) + # make employment type's other than FT a size of 4
+# add labels
+  labs( x = "Experience Level", y = "Salary in U.S. Dollars", color = "Employment Type", shape = "Employment Type", title = "Salary of Data Scientist by Experience Level and Employment Type") +
+  scale_color_manual(values = c("green", "blue", "grey", "red") ) + 
+  theme_bw() + theme( legend.position = "bottom" ) + # title visualization and add theme
+  scale_y_continuous(labels = scales::label_number(prefix = "$", big.mark = ",")) 
+```
+
+
+This ggplot generates a histogram to visualize the distribution of salaries in the data set ds_salaries_data. The x-axis represents the salary in US dollars, and each bar in the histogram corresponds to a salary range. The bars are color-coded based on the company size, providing a visual comparison of salary distributions between different company sizes. The geom_histogram function specifies the number of bins (30L) for the histogram, and the fill color of the bars is set to white. 
+Additionally, the scale_x_continuous function is applied to customize the x-axis breaks and labels. It sets breaks at intervals of $50,000 up to a maximum of $400,000, and the scales::dollar_format() ensures that the x-axis labels are displayed as currency in dollars. This refinement enhances the interpret ability of the salary values on the x-axis.
+```{r histogram for salary vs company size}
+ggplot(
+  ds_salaries_data,
+  mapping=aes(
+    x = salary_in_usd, 
+    colour = company_size
+    )
+  )+
+  geom_histogram(bins = 30L, 
+                 fill = "#FFFFFF"
+                 ) +
+  scale_color_hue(direction = 1) + # adjusts color scheme
+  theme_minimal()+ # theme_minimal customizes the appearance of the plot to a clean, minimalist style
+# add labels
+  xlab("Salary in US Dollars") +
+  ylab("Count") +
+  scale_x_continuous(labels = scales::label_number(prefix = "$", big.mark = ",")) 
+```
+
+We thought that the people who are in the smaller companies might have a lower income due to some reasons, and this histogram exactly proves our thought. We see most of the blue bars are spread over the lower salary part on the x axis.
+
+
+The histogram below visualizes the distribution of data scientist salaries (salary_in_usd), providing an overview of the salary. The x-axis represents the salary range in US dollars, segmented into bins for better readability. The y-axis indicates the frequency or count of data scientists falling within each salary bin.
+
+```{r histogram for salary vs experience level}
+ggplot(ds_salaries_data) +
+  aes(x = salary_in_usd, colour = experience_level) +
+  geom_histogram(bins = 30L, fill = "#FFFFFF") +
+  scale_color_hue(direction = 1) +
+  theme_minimal() +
+  # add labels
+  xlab("Salary in US Dollars") +
+  ylab("Count") +
+  scale_x_continuous(labels = scales::label_number(prefix = "$", big.mark = ",")) 
+```
+
+In summary, this histogram effectively illustrates the distribution of data scientist salaries, highlighting how the frequency of salaries varies across different experience levels. The color-coded bars provide a quick visual reference for understanding how experience influences salary patterns within the data set. In the histogram, we can see that there are more red bars in the first half of the graph since entry-level employees typically receive modest incomes upon joining a company. On the contrary, as we move towards the higher salary brackets on the right, the prevalence of red and green diminishes, giving way to a more prominent presence of purple bars. This shift is reflective of experienced workers or those with more time in the workforce, who tend to command higher salaries.
+
+
+
+This summary table provides an overview of data scientist salaries based on different company sizes. 
+```{r summary table}
+summary_table <- ds_salaries_data %>%
+  group_by(company_size) %>% # you can group by something else, or even not group by anything, i just put random
+  summarise(
+    count=n(),
+    minumum=min(salary_in_usd), 
+    firstQ=quantile(salary_in_usd,0.25),
+    secondQ=quantile(salary_in_usd,0.5), 
+    Median=median(salary_in_usd), 
+    thirdQ=quantile(salary_in_usd,0.75), 
+    maximum=max (salary_in_usd),
+    arithmetic_mean=mean(salary_in_usd), 
+    arithmetic_sd=sd(salary_in_usd)
+)
+ 
+# print out the table
+summary_table %>% 
+  kable(
+  caption="Salary for Data Scientists Summary Table", 
+  booktabs= TRUE,
+  align =c("l", rep("c", 6))
+)%>%
+kableExtra:: kable_styling(
+  bootstrap_options=c("striped", "condensed"), 
+  font_size=16
+)
+```
+The breakdown of each column can be divided into nine parts.
+ 
+1. Company Size: This column represents the size of the companies, categorized as 'L' (Large), 'M' (Medium), and 'S' (Small).
+ 
+2. Count: The number of data points or data scientists included in each company size category. For example, there are 454 data points for Large companies ('L').
+ 
+3. Minimum: The lowest salary observed within each company size category. For instance, the minimum salary for Large companies is $5409. For medium company is $5132 but for small company is $5679
+ 
+4. First Quantile (FirstQ): The 25th percentile or the value below which 25% of the data falls. It gives an idea about the lower range of salaries within each category.
+ 
+5. Second Quantile (SecondQ) or Median: The 50th percentile or the median, representing the middle value of the salary distribution. Half of the salaries are below this value, and half are above. The median is a measure representing the middle value of the salary distribution. In the context of these data scientist salaries, the median salary is crucial because it is not influenced by extreme values, providing a more accurate representation of the typical income.
+ 
+Notably, the median salary values for each company size category reveal interesting insights. Smaller companies ('S') exhibit a lower median salary, standing at $62,146. This suggests that, for half of the data scientists in smaller companies, their salaries fall below this midpoint. In contrast, larger companies ('L') and medium-sized companies ('M') boast higher median salaries of $108,500 and $140,000, respectively.
+ 
+The lower median salary for smaller companies aligns with a common trend where startups or smaller enterprises may have constrained resources, impacting the overall compensation for data scientists. It's essential to consider the median, alongside other quantiles, to gain a comprehensive understanding of the salary distribution and variations within each company size category.
+ 
+6. Third Quantile (ThirdQ): The 75th percentile or the value below which 75% of the data falls. It provides information about the upper range of salaries within each category.
+ 
+7. Maximum: The highest salary observed within each company size category. For example, the maximum salary for Large companies is $423,834.
+ 
+8. Arithmetic Mean (arithmetic_mean): The average salary calculated by summing all values and dividing by the count. It provides an overall measure of central tendency.
+ 
+9. Arithmetic Standard Deviation (arithmetic_sd): A measure of the amount of variation or dispersion in the salaries. A higher standard deviation indicates more variability.
+ 
+This table helps to compare the salary distributions across different company sizes, allowing us to observe trends and variations in data scientist salaries based on company size.
+
+
+# Final Thoughts
+In conclusion, analyzing the data science salaries data set has provided valuable insights into the vast opportunities within the field. The examination of various factors such as salary, experience, and other details has broadened our understanding of the data set we chose, and how to help others understand the data we are presenting.
+
+\newpage
+# Code Appendix
+``` {r codeAppedix}
+#| ref.label = knitr::all_labels(),
+#| echo = TRUE,
+#| eval = FALSE
+```
+
+
+
+
+
